@@ -1,6 +1,7 @@
 CC = gcc
 CPP = g++
 GCCFLAG = -Wall -lpthread
+CXXFLAG = -Wall -pthread
 SOURCES = memorypool.c
 MAIN_SOURCES = test.cpp
 MAIN_OUTPUT = test
@@ -9,12 +10,12 @@ EXAMPLE_OUTPUT = example
 THREAD_SAFE = -D _Z_MEMORYPOOL_THREAD_
 
 run_single_test:
-	$(CPP) $(GCCFLAG) $(MAIN_SOURCES) $(SOURCES) -o $(MAIN_OUTPUT).out
+	$(CPP) $(CXXFLAG) $(MAIN_SOURCES) $(SOURCES) -o $(MAIN_OUTPUT).out
 	./$(MAIN_OUTPUT).out
 
 # 多线程
 run_multi_test:
-	$(CPP) $(GCCFLAG) $(MAIN_SOURCES) $(SOURCES) $(THREAD_SAFE) -o $(MAIN_OUTPUT).out
+	$(CPP) $(CXXFLAG) $(MAIN_SOURCES) $(SOURCES) $(THREAD_SAFE) -o $(MAIN_OUTPUT).out
 	./$(MAIN_OUTPUT).out
 
 run_example:
