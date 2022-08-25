@@ -153,7 +153,9 @@ MemoryPool* MemoryPoolInit(mem_size_t maxmempoolsize, mem_size_t mempoolsize) {
     mp->last_id = 0;
     if (mempoolsize < maxmempoolsize) mp->auto_extend = 1;
     mp->max_mem_pool_size = maxmempoolsize;
-    mp->total_mem_pool_size = mp->mem_pool_size = mempoolsize;
+    mp->total_mem_pool_size = mempoolsize;
+    mp->max_sub_mem_pool_size = mempoolsize;
+    mp->mem_pool_size = mempoolsize;
 
 #ifdef _Z_MEMORYPOOL_THREAD_
     pthread_mutex_init(&mp->lock, NULL);
@@ -175,11 +177,33 @@ MemoryPool* MemoryPoolInit(mem_size_t maxmempoolsize, mem_size_t mempoolsize) {
     return mp;
 }
 
+/*
+ * Internal interface, dynamic adjustment memory pool size
+ */
+static void* MemoryPoolResizeAlloc(MemoryPool* mp, mem_size_t total_needed_size) {
+    if (total_needed_size > (mp->max_mem_pool_size - mp->total_mem_pool_size))
+        return NULL;
+    _MP_Memory *mm = extend_memory_list(mp, total_needed_size);
+    _MP_Chunk *not_free = NULL;
+    if (!mm) return NULL;
+    mp->max_sub_mem_pool_size = total_needed_size;
+    mp->total_mem_pool_size += total_needed_size;
+    // Since the size of the allocated memory pool is total_needed_size,
+    // there is only one memory chunk
+    not_free = mm->free_list;
+    *(_MP_Chunk**) ((char*) not_free + not_free->alloc_mem - MP_CHUNKEND) = not_free;
+    mm->free_list = NULL;
+    mm->alloc_list = not_free;
+    mm->alloc_mem = total_needed_size;
+    mm->alloc_prog_mem = (mm->alloc_mem - MP_CHUNKHEADER - MP_CHUNKEND);
+    return (void*) ((char*) not_free + MP_CHUNKHEADER);
+}
+
 void* MemoryPoolAlloc(MemoryPool* mp, mem_size_t wantsize) {
     if (wantsize <= 0) return NULL;
-    mem_size_t total_needed_size =
-            MP_ALIGN_SIZE(wantsize + MP_CHUNKHEADER + MP_CHUNKEND);
-    if (total_needed_size > mp->mem_pool_size) return NULL;
+    mem_size_t total_needed_size = MP_ALIGN_SIZE(wantsize + MP_CHUNKHEADER + MP_CHUNKEND);
+    if (total_needed_size > mp->max_sub_mem_pool_size)
+        return MemoryPoolResizeAlloc(mp, total_needed_size);
 
     _MP_Memory *mm = NULL, *mm1 = NULL;
     _MP_Chunk *_free = NULL, *_not_free = NULL;
@@ -189,7 +213,7 @@ void* MemoryPoolAlloc(MemoryPool* mp, mem_size_t wantsize) {
 FIND_FREE_CHUNK:
     mm = mp->mlist;
     while (mm) {
-        if (mp->mem_pool_size - mm->alloc_mem < total_needed_size) {
+        if (mm->mem_pool_size - mm->alloc_mem < total_needed_size) {
             mm = mm->next;
             continue;
         }
@@ -253,9 +277,11 @@ FIND_FREE_CHUNK:
         if (mp->total_mem_pool_size >= mp->max_mem_pool_size) {
             goto err_out;
         }
-        mem_size_t add_mem_sz = mp->max_mem_pool_size - mp->mem_pool_size;
-        add_mem_sz = add_mem_sz >= mp->mem_pool_size ? mp->mem_pool_size
-                                                     : add_mem_sz;
+        mem_size_t add_mem_sz = mp->max_mem_pool_size - mp->total_mem_pool_size;
+        if (total_needed_size > add_mem_sz) goto err_out;
+        add_mem_sz = total_needed_size >= mp->mem_pool_size ? total_needed_size
+                                                     : (add_mem_sz >= mp->mem_pool_size ? mp->mem_pool_size
+                                                     : add_mem_sz);
         mm1 = extend_memory_list(mp, add_mem_sz);
         if (!mm1) {
             goto err_out;

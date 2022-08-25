@@ -14,7 +14,7 @@
 #define GB (mem_size_t)(1 << 30)
 
 typedef struct _mp_chunk {
-    mem_size_t alloc_mem;
+    mem_size_t alloc_mem; /* chunk size */
     struct _mp_chunk *prev, *next;
     int is_free;
 } _MP_Chunk;
@@ -22,9 +22,9 @@ typedef struct _mp_chunk {
 typedef struct _mp_mem_pool_list {
     char* start;
     unsigned int id;
-    mem_size_t mem_pool_size;
-    mem_size_t alloc_mem;
-    mem_size_t alloc_prog_mem;
+    mem_size_t mem_pool_size; /* total size */
+    mem_size_t alloc_mem; /* used size */
+    mem_size_t alloc_prog_mem; /* used size except MP_CHUNKHEADER and MP_CHUNKEND */
     _MP_Chunk *free_list, *alloc_list;
     struct _mp_mem_pool_list* next;
 } _MP_Memory;
@@ -32,7 +32,9 @@ typedef struct _mp_mem_pool_list {
 typedef struct _mp_mem_pool {
     unsigned int last_id;
     int auto_extend;
-    mem_size_t mem_pool_size, total_mem_pool_size, max_mem_pool_size;
+    mem_size_t mem_pool_size, max_sub_mem_pool_size;
+    mem_size_t total_mem_pool_size;
+    mem_size_t max_mem_pool_size;
     struct _mp_mem_pool_list* mlist;
 #ifdef _Z_MEMORYPOOL_THREAD_
     pthread_mutex_t lock;
