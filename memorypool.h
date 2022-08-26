@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #define mem_size_t unsigned long long
 #define KB (mem_size_t)(1 << 10)
@@ -60,6 +61,7 @@ int get_memory_id(_MP_Memory* mm);
 
 MemoryPool* MemoryPoolInit(mem_size_t maxmempoolsize, mem_size_t mempoolsize);
 void* MemoryPoolAlloc(MemoryPool* mp, mem_size_t wantsize);
+void* MemoryPoolAlignedAlloc(MemoryPool* mp, mem_size_t wantsize, mem_size_t aligned);
 int MemoryPoolFree(MemoryPool* mp, void* p);
 MemoryPool* MemoryPoolClear(MemoryPool* mp);
 int MemoryPoolDestroy(MemoryPool* mp);

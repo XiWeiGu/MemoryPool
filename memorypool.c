@@ -299,6 +299,12 @@ err_out:
     return NULL;
 }
 
+void* MemoryPoolAlignedAlloc(MemoryPool* mp, mem_size_t wantsize, mem_size_t aligned) {
+    // Simple, but rough
+    return (void*)(((uint64_t)MemoryPoolAlloc(mp, wantsize + (aligned - 1)) + aligned - 1) & \
+           (~(aligned - 1)));
+}
+
 int MemoryPoolFree(MemoryPool* mp, void* p) {
     if (p == NULL || mp == NULL) return 1;
 #ifdef _Z_MEMORYPOOL_THREAD_
@@ -307,7 +313,19 @@ int MemoryPoolFree(MemoryPool* mp, void* p) {
     _MP_Memory* mm = mp->mlist;
     if (mp->auto_extend) mm = find_memory_list(mp, p);
 
-    _MP_Chunk* ck = (_MP_Chunk*) ((char*) p - MP_CHUNKHEADER);
+    /*
+     * Due to the addition of the alignment allocation interface,
+     * We can not find chunk in old way
+     */
+    // _MP_Chunk* ck = (_MP_Chunk*) ((char*) p - MP_CHUNKHEADER);
+    _MP_Chunk* ck = mm->alloc_list;
+    while(ck) {
+        if ((uint64_t)ck < (uint64_t)p &&
+            (uint64_t)p < (uint64_t)(ck + ck->alloc_mem)) {
+            break;
+        }
+        ck = ck->next;
+    }
 
     MP_DLINKLIST_DEL(mm->alloc_list, ck);
     MP_DLINKLIST_INS_FRT(mm->free_list, ck);
